@@ -1,6 +1,9 @@
 #include "CircuitOptimizer.hpp"
 #include "QuantumComputation.hpp"
 #include "algorithms/RandomCliffordCircuit.hpp"
+#include "dd/FunctionalityConstruction.hpp"
+#include "dd/Simulation.hpp"
+
 
 #include "gtest/gtest.h"
 #include <iostream>
@@ -1908,3 +1911,4 @@ TEST_F(QFRFunctionality, dumpAndImportTeleportation) {
   ASSERT_EQ(qcImported.size(), 1);
   EXPECT_EQ(qcImported.at(0)->getType(), OpType::Teleportation);
 }
+

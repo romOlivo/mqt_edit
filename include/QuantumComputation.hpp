@@ -26,6 +26,7 @@ class CircuitOptimizer;
 
 class QuantumComputation {
 public:
+  static const int test_flag = 1;
   using iterator = typename std::vector<std::unique_ptr<Operation>>::iterator;
   using const_iterator =
       typename std::vector<std::unique_ptr<Operation>>::const_iterator;

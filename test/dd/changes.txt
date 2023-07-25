@@ -1,0 +1,55 @@
+TEST_F(DDFunctionality, constructCircuitDDSycamore) {
+  QuantumComputation qc{};
+  std::stringstream ss;
+  std::string qasm ;
+  std::unique_ptr<dd::Package<>> dd_temp;
+  // First Circuit
+  /*
+  qasm = "// i 0 1\n"
+          "// o 0 1\n"
+          "OPENQASM 2.0;\n"
+          "include \"qelib1.inc\";\n"
+          "qreg q[2];\n"
+          "rz(1/8) q[0];\n"
+          "p(1/8) q[1];\n"
+          "crz(1/8) q[0],q[1];\n"
+          "cp(1/8) q[0],q[1];\n";
+  ss << qasm;
+  qc.import(ss, qc::Format::OpenQASM);
+  dd_temp = std::make_unique<dd::Package<>>(2);
+  */
+  // Second Circuit
+  std::ifstream myfile; 
+  myfile.open("test2.qasm");
+  EXPECT_TRUE(myfile.is_open());
+  std::string myline;
+  if ( myfile.is_open() ) {
+    qasm = "";
+    while ( myfile ) {
+      std::getline (myfile, myline);
+      qasm = qasm + myline + "\n";
+    }
+  }
+  /*
+  // Show qasm file
+  for (int i = 0; i < 100; i++) {
+    std::cout << qasm[i];
+  }
+  std::cout << "\n";
+  */
+
+  ss << qasm;
+
+  /*
+  // Show stringstream interpretation
+  std::string aux; 
+  for (int i = 0; i < 100; i++) {
+    ss >> aux;
+    std::cout << aux << "\n";
+  }
+  */
+  
+  qc.import(ss, qc::Format::OpenQASM);
+  dd_temp = std::make_unique<dd::Package<>>(12);
+  const qc::MatrixDD ddf2 = buildFunctionalityRecursive(&qc, dd_temp);
+}

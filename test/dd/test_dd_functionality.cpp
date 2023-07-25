@@ -5,6 +5,7 @@
 
 #include "gtest/gtest.h"
 #include <random>
+using namespace std::chrono;
 
 using namespace qc;
 
@@ -389,4 +390,357 @@ TEST_F(DDFunctionality, FuseSingleQubitGatesAcrossOtherGates) {
   qc.print(std::cout);
   EXPECT_EQ(qc.getNops(), 2);
   EXPECT_EQ(e, f);
+}
+
+TEST_F(DDFunctionality, constructCircuitDD) {
+  QuantumComputation qc{};
+  const std::string qasm = "// i 0 1\n"
+                           "// o 0 1\n"
+                           "OPENQASM 2.0;\n"
+                           "include \"qelib1.inc\";\n"
+                           "qreg q[2];\n"
+                           "rz(1/8) q[0];\n"
+                           "p(1/8) q[1];\n"
+                           "crz(1/8) q[0],q[1];\n"
+                           "cp(1/8) q[0],q[1];\n";
+  std::stringstream ss;
+  ss << qasm;
+  /*
+  // Show stringstream interpretation
+  std::string aux; 
+  for (int i = 0; i < 10; i++) {
+    ss >> aux;
+    std::cout << aux << "\n";
+  }
+  // End
+  */
+  qc.import(ss, qc::Format::OpenQASM);
+  std::unique_ptr<dd::Package<>> dd_temp;
+  dd_temp = std::make_unique<dd::Package<>>(2);
+  const qc::MatrixDD ddf = buildFunctionality(&qc, dd_temp);
+
+  EXPECT_TRUE(true);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDFromFileBasic) {
+  QuantumComputation qc{};
+  std::stringstream ss;
+  std::string qasm;
+  std::unique_ptr<dd::Package<>> dd_temp;
+  std::ifstream myfile; 
+  myfile.open("test.qasm");
+  EXPECT_TRUE(myfile.is_open());
+  std::string myline;
+  if ( myfile.is_open() ) {
+    qasm = "";
+    while ( myfile ) {
+      std::getline (myfile, myline);
+      qasm = qasm + myline + "\n";
+    }
+  }
+  ss << qasm;
+  qc.import(ss, qc::Format::OpenQASM);
+  dd_temp = std::make_unique<dd::Package<>>(2);
+  const qc::MatrixDD ddf = buildFunctionality(&qc, dd_temp);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDFromFile) {
+  QuantumComputation qc{};
+  std::stringstream ss;
+  // First Circuit
+  std::string qasm = "// i 0 1\n"
+                      "// o 0 1\n"
+                      "OPENQASM 2.0;\n"
+                      "qreg q[2];\n"
+                      "rz(1/8) q[0];\n"
+                      "p(1/8) q[1];\n"
+                      "crz(1/8) q[0],q[1];\n"
+                      "cp(1/8) q[0],q[1];\n";
+  ss << qasm;
+  qc.import(ss, qc::Format::OpenQASM);
+  std::unique_ptr<dd::Package<>> dd_temp;
+  dd_temp = std::make_unique<dd::Package<>>(2);
+  const qc::MatrixDD ddf = buildFunctionality(&qc, dd_temp);
+  // Second Circuit
+  std::ifstream myfile; 
+  myfile.open("test.qasm");
+  EXPECT_TRUE(myfile.is_open());
+  std::string myline;
+  if ( myfile.is_open() ) {
+    qasm = "";
+    while ( myfile ) {
+      std::getline (myfile, myline);
+      qasm = qasm + myline + "\n";
+    }
+  }
+  ss << qasm;
+  qc.import(ss, qc::Format::OpenQASM);
+  dd_temp = std::make_unique<dd::Package<>>(2);
+  const qc::MatrixDD ddf2 = buildFunctionality(&qc, dd_temp);
+  // Comprobations
+  EXPECT_TRUE(ddf == ddf2);
+}
+
+
+void testCircuitRecursive(std::string file, int n) {
+  //Setup();
+
+  dd::QubitCount nqubits = n;
+  std::size_t initialCacheCount = 0U;
+  std::size_t initialComplexCount = 0U;
+  qc::MatrixDD e{}, ident{};
+  std::unique_ptr<dd::Package<>> dd;
+  std::mt19937_64 mt;
+  std::uniform_real_distribution<dd::fp> dist;
+  // dd
+  dd = std::make_unique<dd::Package<>>(nqubits);
+  initialCacheCount = dd->cn.complexCache.getCount();
+  initialComplexCount = dd->cn.complexTable.getCount();
+
+  // initial state preparation
+  e = ident = dd->makeIdent(nqubits);
+  dd->incRef(ident);
+
+  std::array<std::mt19937_64::result_type, std::mt19937_64::state_size>
+      randomData{};
+  std::random_device rd;
+  std::generate(begin(randomData), end(randomData), [&]() { return rd(); });
+  std::seed_seq seeds(begin(randomData), end(randomData));
+  mt.seed(seeds);
+
+
+
+  QuantumComputation qc{};
+  std::stringstream ss;
+  std::string qasm ;
+  std::unique_ptr<dd::Package<>> dd_temp;
+  std::ifstream myfile; 
+  myfile.open(file);
+  EXPECT_TRUE(myfile.is_open());
+  std::string myline;
+  if ( myfile.is_open() ) {
+    qasm = "";
+    while ( myfile ) {
+      std::getline (myfile, myline);
+      qasm = qasm + myline + "\n";
+    }
+  }
+  ss << qasm;
+
+  qc.import(ss, qc::Format::OpenQASM);
+  //dd = std::make_unique<dd::Package<>>(n);
+  auto start = high_resolution_clock::now();
+  const qc::MatrixDD ddf2 = dd::buildFunctionality(&qc, dd);
+  auto stop = high_resolution_clock::now();
+  auto duration = duration_cast<milliseconds>(stop - start);
+  std::cout << "Time: " << duration.count() / 1000.0 << std::endl;
+}
+
+TEST_F(DDFunctionality, constructCircuitDDSycamore552) {
+  int n = 12;
+  testCircuitRecursive("Circuits/sycamore_" + std::__cxx11::to_string(552) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFT10) {
+  nqubits = 10U;
+  testCircuitRecursive("Circuits/qftentangled_indep_qiskit_" + std::__cxx11::to_string(nqubits) + ".qasm", nqubits);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTFast) {
+  for (int n = 7; n <= 11; n++) {
+    std::cout << "Testing with " << n << " qubits: \n";
+    testCircuitRecursive("Circuits/qft_" + std::__cxx11::to_string(n) + ".qasm", n);
+  }
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTEntangled7) {
+  int n = 7;
+  testCircuitRecursive("Circuits/qftentangled_indep_qiskit_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTEntangled8) {
+  int n = 8;
+  testCircuitRecursive("Circuits/qftentangled_indep_qiskit_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTEntangled9) {
+  int n = 9;
+  testCircuitRecursive("Circuits/qftentangled_indep_qiskit_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTEntangled10) {
+  int n = 10;
+  testCircuitRecursive("Circuits/qftentangled_indep_qiskit_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTEntangled11) {
+  int n = 11;
+  testCircuitRecursive("Circuits/qftentangled_indep_qiskit_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIndep7) {
+  int n = 7;
+  testCircuitRecursive("Circuits/qft_indep_qiskit_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIndep8) {
+  int n = 8;
+  testCircuitRecursive("Circuits/qft_indep_qiskit_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIndep9) {
+  int n = 9;
+  testCircuitRecursive("Circuits/qft_indep_qiskit_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIndep10) {
+  int n = 10;
+  testCircuitRecursive("Circuits/qft_indep_qiskit_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIndep11) {
+  int n = 11;
+  testCircuitRecursive("Circuits/qft_indep_qiskit_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIBM0Q7) {
+  int n = 7;
+  testCircuitRecursive("Circuits/qft_nativegates_ibm_qiskit_opt0_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIBM0Q8) {
+  int n = 8;
+  testCircuitRecursive("Circuits/qft_nativegates_ibm_qiskit_opt0_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIBM0Q9) {
+  int n = 9;
+  testCircuitRecursive("Circuits/qft_nativegates_ibm_qiskit_opt0_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIBM0Q10) {
+  int n = 10;
+  testCircuitRecursive("Circuits/qft_nativegates_ibm_qiskit_opt0_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIBM0Q11) {
+  int n = 11;
+  testCircuitRecursive("Circuits/qft_nativegates_ibm_qiskit_opt0_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIBM3Q7) {
+  int n = 7;
+  testCircuitRecursive("Circuits/qft_nativegates_ibm_qiskit_opt3_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIBM3Q8) {
+  int n = 8;
+  testCircuitRecursive("Circuits/qft_nativegates_ibm_qiskit_opt3_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIBM3Q9) {
+  int n = 9;
+  testCircuitRecursive("Circuits/qft_nativegates_ibm_qiskit_opt3_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIBM3Q10) {
+  int n = 10;
+  testCircuitRecursive("Circuits/qft_nativegates_ibm_qiskit_opt3_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIBM3Q11) {
+  int n = 11;
+  testCircuitRecursive("Circuits/qft_nativegates_ibm_qiskit_opt3_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIonQ0Q7) {
+  int n = 7;
+  testCircuitRecursive("Circuits/qft_nativegates_ionq_qiskit_opt0_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIonQ0Q8) {
+  int n = 8;
+  testCircuitRecursive("Circuits/qft_nativegates_ionq_qiskit_opt0_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIonQ0Q9) {
+  int n = 9;
+  testCircuitRecursive("Circuits/qft_nativegates_ionq_qiskit_opt0_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIonQ0Q10) {
+  int n = 10;
+  testCircuitRecursive("Circuits/qft_nativegates_ionq_qiskit_opt0_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIonQ0Q11) {
+  int n = 11;
+  testCircuitRecursive("Circuits/qft_nativegates_ionq_qiskit_opt0_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIonQ3Q7) {
+  int n = 7;
+  testCircuitRecursive("Circuits/qft_nativegates_ionq_qiskit_opt3_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIonQ3Q8) {
+  int n = 8;
+  testCircuitRecursive("Circuits/qft_nativegates_ionq_qiskit_opt3_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIonQ3Q9) {
+  int n = 9;
+  testCircuitRecursive("Circuits/qft_nativegates_ionq_qiskit_opt3_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIonQ3Q10) {
+  int n = 10;
+  testCircuitRecursive("Circuits/qft_nativegates_ionq_qiskit_opt3_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTIonQ3Q11) {
+  int n = 11;
+  testCircuitRecursive("Circuits/qft_nativegates_ionq_qiskit_opt3_" + std::__cxx11::to_string(n) + ".qasm", n);
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFToqc0Q) {
+  for (int n = 7; n <= 11; n++) {
+    std::cout << "Testing with " << n << " qubits: \n";
+    testCircuitRecursive("Circuits/qft_nativegates_oqc_qiskit_opt0_" + std::__cxx11::to_string(n) + ".qasm", n);
+  }
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFToqc3Q) {
+  for (int n = 7; n <= 11; n++) {
+    std::cout << "Testing with " << n << " qubits: \n";
+    testCircuitRecursive("Circuits/qft_nativegates_oqc_qiskit_opt3_" + std::__cxx11::to_string(n) + ".qasm", n);
+  }
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTQuantinum0Q) {
+  for (int n = 7; n <= 11; n++) {
+    std::cout << "Testing with " << n << " qubits: \n";
+    testCircuitRecursive("Circuits/qft_nativegates_quantinuum_qiskit_opt0_" + std::__cxx11::to_string(n) + ".qasm", n);
+  }
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTQuantinum3Q) {
+  for (int n = 7; n <= 11; n++) {
+    std::cout << "Testing with " << n << " qubits: \n";
+    testCircuitRecursive("Circuits/qft_nativegates_quantinuum_qiskit_opt3_" + std::__cxx11::to_string(n) + ".qasm", n);
+  }
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTRiguetti0Q) {
+  for (int n = 7; n <= 11; n++) {
+    std::cout << "Testing with " << n << " qubits: \n";
+    testCircuitRecursive("Circuits/qft_nativegates_rigetti_qiskit_opt0_" + std::__cxx11::to_string(n) + ".qasm", n);
+  }
+}
+
+TEST_F(DDFunctionality, constructCircuitDDQFTRiguetti3Q) {
+  for (int n = 7; n <= 11; n++) {
+    std::cout << "Testing with " << n << " qubits: \n";
+    testCircuitRecursive("Circuits/qft_nativegates_rigetti_qiskit_opt3_" + std::__cxx11::to_string(n) + ".qasm", n);
+  }
 }
